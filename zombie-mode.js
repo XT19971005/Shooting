@@ -1,10 +1,9 @@
 /*
  * LAST LIGHT // Zombie District
  *
- * This file is an additive gameplay layer for the MIT-licensed Operation
- * Ironhold baseline. The original game remains in index.original.html; this
- * layer changes the theme, turns the AI into melee infected, adds city props,
- * and adds a simple grenade action without replacing the upstream code.
+ * 这是叠加在 MIT 许可基础版本上的玩法层。
+ * 原始版本保留在 index.original.html；本文件负责主题、僵尸近战、城市街区、
+ * 手雷、刀具检视和枪械检视，不替换基础射击与移动系统。
  */
 (function () {
   'use strict';
@@ -156,7 +155,7 @@
       for (const [w, h, d, x, y, z, color, map] of facade) {
         const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.91, metalness: 0.03 });
         box(w, h, d, x, y, z, mat, { map, uvScale: [0.28, 0.28] });
-        // Window strips make the mass read as a city block instead of a box wall.
+        // 窗带让建筑看起来像街区，而不是单纯的盒子墙。
         const windowMat = new THREE.MeshStandardMaterial({ color: 0x17232c, roughness: 0.44, metalness: 0.12, emissive: 0x071019, emissiveIntensity: 0.7 });
         for (let row = 0; row < Math.max(2, Math.floor(h / 2.3)); row++) {
           const pane = new THREE.Mesh(new THREE.BoxGeometry(Math.min(w * 0.62, 3.4), 0.52, 0.035), windowMat);
@@ -191,9 +190,8 @@
     }
   }
 
-  // Replace the warehouse scene with a small authored block.  The gameplay
-  // code (movement, raycasts, AI and weapons) stays intact, but no upstream
-  // environment mesh, texture, fog card or shadow caster remains in the frame.
+  // 用轻量化的自制街区替换仓库场景。移动、射线、AI 和武器逻辑保持不变，
+  // 画面中不再保留基础版本的环境模型、贴图、雾卡或阴影投射物。
   function buildOurLiteScene() {
     if (mod.liteSceneBuilt || typeof scene === 'undefined') return;
     try {
@@ -282,7 +280,7 @@
         sign.position.set(x, Math.min(h - 0.55, 4.9), z - d * 0.512); scene.add(sign);
       });
 
-      // A few cheap cover pieces make the block playable without a prop pack.
+      // 使用少量低成本掩体，让街区不依赖外部道具包也能进行战斗。
       [[-8, -10, 2.2, 1.1, 1.0], [10, -8, 2.8, 1.2, 1.0], [-9, 10, 1.8, 1.0, 1.2], [9, 11, 2.4, 1.3, 0.9]].forEach(([x, z, w, h, d]) => {
         addBox(w, h, d, x, z, trimMat, true, '#8c6546');
       });
@@ -405,9 +403,8 @@
     const glove = new THREE.MeshStandardMaterial({ color: 0x27372d, roughness: 0.94, metalness: 0.02 });
 
     knifeVM = new THREE.Group();
-    // Authored low-poly combat knife.  The blade uses a real silhouette rather
-    // than stacked cones, so the spine, point and fuller remain readable at
-    // the small first-person scale.
+    // 自制低多边形战术刀。刀身使用真实轮廓，而不是堆叠圆锥，
+    // 这样在第一人称的小尺寸画面中仍能看清刀背、刀尖和血槽。
     const bladeShape = new THREE.Shape();
     bladeShape.moveTo(-0.072, 0.02);
     bladeShape.lineTo(0.064, 0.02);
@@ -458,7 +455,7 @@
     knifeVM.add(hand);
     knifeVM.position.set(0.30, -0.17, -0.78);
     knifeVM.rotation.set(-0.28, 0.18, -0.30);
-    // Keep the silhouette prominent without covering the reticle during play.
+    // 保持刀身轮廓清晰，同时不遮挡游戏中的准星。
     knifeVM.scale.setScalar(0.82);
     knifeVM.visible = false;
     vmRecoil.add(knifeVM);
@@ -552,10 +549,9 @@
       knifeVM.position.y = -0.17 + arc * 0.05 + inspectIn * 0.10;
       knifeVM.position.z = -0.78 + inspectIn * 0.16;
     }
-    // CS-style inspect for the authored firearms: raise the active viewmodel,
-    // cant it toward the centre, then continuously give it a small showroom
-    // yaw.  Additive offsets are applied after the base animation each frame,
-    // so recoil, bob, reload and ADS continue to work normally.
+    // 类似 CS 的枪械检视：抬起当前枪械并向画面中心倾斜，
+    // 再持续施加轻微的展示旋转。偏移在基础动画之后叠加，
+    // 因此后坐力、呼吸摆动、换弹和开镜仍可正常工作。
     if ((mod.slot === 1 || mod.slot === 2) && typeof vmSway !== 'undefined') {
       const b = mod.inspectBlend;
       const t = mod.inspectTime;
@@ -718,25 +714,21 @@
       decorateAllEnemies();
       buildUtilityViewmodels();
 
-      // A query-string test mode keeps automated browser QA deterministic and
-      // avoids requiring Pointer Lock support from the test browser.
+      // 查询参数测试模式用于保持浏览器自动测试稳定，并兼容不支持鼠标锁定的环境。
       if (new URLSearchParams(location.search).has('test') && !mod.testMode && typeof requestLock === 'function') {
         mod.testMode = true;
         setTimeout(function () {
           if (typeof G !== 'undefined' && !G.started && typeof startGame === 'function') {
             startGame();
-            // Keep the deterministic QA view alive long enough to inspect
-            // movement, weapons and the custom street without AI pressure.
+            // 延长测试视图时间，便于检查移动、武器和自制街区，不受僵尸攻击干扰。
             G.grace = 60;
           }
         }, 120);
       }
 
-      // The QA URL auto-starts the round, so there is no start-screen click
-      // available to satisfy Pointer Lock's user-gesture requirement.  Let the
-      // first click on the game canvas capture the mouse just like the normal
-      // start flow; without this, mousemove events are correctly ignored by the
-      // browser because pointerLockElement remains null.
+      // 测试地址会自动开始游戏，没有开始界面的点击手势可用于申请鼠标锁定。
+      // 因此第一次点击画布时按正常流程捕获鼠标，否则浏览器会因
+      // pointerLockElement 为空而忽略鼠标移动事件。
       if (!mod.pointerCaptureWrapped) {
         let lastX = null;
         let lastY = null;
@@ -769,10 +761,9 @@
         mod.pointerCaptureWrapped = true;
       }
 
-      // Chromium's in-app preview can reject Pointer Lock even after a valid
-      // start click.  Keep the same CS-style mouse look by falling back to
-      // clientX/clientY deltas when that rejection is detected; normal desktop
-      // browsers still use Pointer Lock with raw movement deltas.
+      // Chromium 内置预览可能在有效点击后仍拒绝鼠标锁定。
+      // 检测到拒绝后，改用 clientX/clientY 的位移实现同样的 CS 式转向；
+      // 普通桌面浏览器仍使用 Pointer Lock 的原始位移。
       if (!mod.requestLockWrapped && typeof requestLock === 'function') {
         const baseRequestLock = requestLock;
         requestLock = function () {
@@ -822,9 +813,8 @@
       if (typeof endGame === 'function' && !mod.endWrapped) {
         const baseEnd = endGame;
         endGame = function (win) {
-          // The upstream win check fires every time G.kills >= 10. Convert
-          // that check into three short zombie waves without touching the
-          // original combat and score bookkeeping.
+          // 基础版本在击杀数达到 10 时就判定胜利，这里改为三轮僵尸波次，
+          // 不改动原有战斗和计分记录。
           if (win && mod.wave < mod.waveCount && G.kills % 10 === 0 && !mod.waveTransition) {
             nextWave();
             return;

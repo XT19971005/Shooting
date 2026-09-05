@@ -1,7 +1,6 @@
-/* dev-only autoplay bot for regression runs; never referenced by index.html */
+/* 仅用于回归测试的自动操作机器人；不会被 index.html 自动加载。 */
 
-/* Grid pathfinder over the same colliders the player obeys, so the bot routes
-   around cover instead of grinding into it. */
+/* 使用与玩家相同的碰撞体进行网格寻路，让机器人绕过掩体而不是顶着掩体走。 */
 const NAV = (() => {
   const STEP = 0.5, W = Math.round(60 / STEP) + 1;
   const cell = v => Math.round((v + 30) / STEP);
@@ -12,7 +11,7 @@ const NAV = (() => {
     for (let j = 0; j < W; j++) for (let i = 0; i < W; i++)
       free[j*W+i] = blocked(world(i), world(j), 0.35, 1.6, 0.42) ? 0 : 1;
   }
-  /* BFS, returns the next waypoint toward (tx,tz) or null */
+  /* 广度优先搜索，返回前往 (tx,tz) 的下一个路点，没有路时返回空值。 */
   return function nav(sx, sz, tx, tz){
     if (!free) build();
     const si = cell(sx), sj = cell(sz), ti = cell(tx), tj = cell(tz);
@@ -38,14 +37,14 @@ const NAV = (() => {
     }
     let node = found !== -1 ? found : bestIdx;
     if (node === -1 || node === start) return null;
-    /* walk back to the step after start */
+    /* 回溯到起点之后的第一步。 */
     let guard = 0;
     while (prev[node] !== start && prev[node] !== node && guard++ < 8000) node = prev[node];
     return [world(node % W), world((node - node % W) / W)];
   };
 })();
 
-/* err = radians of aim error per shot, react = pause after acquiring a target */
+/* err 是每发子弹的瞄准误差（弧度），react 是锁定目标后的反应延迟。 */
 window.__human = function(err, react){
   err = err === undefined ? 0.018 : err;
   react = react === undefined ? 0.22 : react;
@@ -56,7 +55,7 @@ window.__human = function(err, react){
     if (!G.running) return;
     const dt = 0.05, P = player.pos;
 
-    /* pick the nearest enemy with a clear line */
+    /* 选择距离最近且视线畅通的敌人。 */
     let best = null, bd = 1e9;
     const eye = camera.position.clone();
     const R = new THREE.Raycaster();
@@ -90,7 +89,7 @@ window.__human = function(err, react){
         if (w.mag <= 0) startReload();
         else { player.triggerHeld = true; player.clickBuf = 0.1; }
       }
-      /* strafe while engaging */
+      /* 交战时左右横移。 */
       sideT -= dt;
       if (sideT <= 0){ side = Math.random() < 0.5 ? -1 : 1; sideT = rand(0.7, 1.6); }
       const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
@@ -101,7 +100,7 @@ window.__human = function(err, react){
     } else {
       player.triggerHeld = false;
       if (player.ads) setADS(false);
-      /* route to the nearest living enemy */
+      /* 寻路前往最近的存活敌人。 */
       const alive = enemies.filter(e => !e.dead);
       if (!alive.length) return;
       let goal = alive[0], gd = 1e9;
@@ -126,7 +125,7 @@ window.__human = function(err, react){
         player.pitch += (0 - player.pitch) * 0.2;
       }
     }
-    /* stay on the deck */
+    /* 保持在可行走平面上。 */
     const g = groundAt(P.x, P.z, P.y + 1.2);
     if (g !== null && g < P.y + 0.7) P.y = g;
     const w = WEAPONS[player.weapon];
