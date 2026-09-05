@@ -727,7 +727,7 @@ const SFX = (function(){
    ========================================================================= */
 const canvas   = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias:false, powerPreference:'high-performance', stencil:false });
-const DPR = Math.min(window.devicePixelRatio||1, 1.5);
+const DPR = Math.min(window.devicePixelRatio||1, 1.25);
 renderer.setPixelRatio(DPR);
 renderer.setSize(innerWidth, innerHeight);
 renderer.autoClear = false;
@@ -789,7 +789,7 @@ function makeRT(w,h,depth){
                  format:THREE.RGBAFormat, type:rtType, depthBuffer:!!depth, stencilBuffer:false };
   if (depth && isGL2 && THREE.WebGLMultisampleRenderTarget){
     const rt = new THREE.WebGLMultisampleRenderTarget(w,h,opts);
-    rt.samples = 4;
+    rt.samples = 2;
     return rt;
   }
   return new THREE.WebGLRenderTarget(w,h,opts);
@@ -798,8 +798,8 @@ let sceneRT, bloomA, bloomB, RTW, RTH;
 /* The whole frame lands in an offscreen target that the composite pass
    upscales, so render resolution can float independently of the canvas. */
 let renderScale = 1.0;
-const SCALE_STEPS = [1.0, 0.88, 0.76, 0.64, 0.55];
-let scaleIdx = 0;
+const SCALE_STEPS = [0.82, 0.72, 0.64, 0.56, 0.50];
+let scaleIdx = 1;
 function allocTargets(){
   RTW = Math.max(2, Math.floor(innerWidth*DPR*renderScale));
   RTH = Math.max(2, Math.floor(innerHeight*DPR*renderScale));

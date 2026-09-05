@@ -3,7 +3,7 @@
  *
  * 这是叠加在 MIT 许可基础版本上的玩法层。
  * 原始版本保留在 index.original.html；本文件负责主题、僵尸近战、城市街区、
- * 手雷、刀具检视和枪械检视，不替换基础射击与移动系统。
+ * 手雷和刀具攻击，不替换基础射击与移动系统。
  */
 (function () {
   'use strict';
@@ -127,9 +127,6 @@
       if (weaponRow) weaponRow.innerHTML = '<kbd>1–4</kbd> <span>PISTOL · RIFLE · KNIFE · GRENADE</span>';
       const fireRow = rows.find((row) => row.textContent.includes('FIRE'));
       if (fireRow) fireRow.innerHTML = '<kbd>LMB</kbd> <span>FIRE · KNIFE SWING · THROW</span>';
-      if (!rows.some((row) => row.textContent.includes('INSPECT'))) {
-         startKeys.insertAdjacentHTML('beforeend', '<div class="key"><kbd>F</kbd> <span>INSPECT ACTIVE WEAPON</span></div>');
-      }
     }
 
     const hud = document.getElementById('hud');
@@ -220,6 +217,7 @@
       scene.fog = new THREE.Fog(0x0b151b, 24, 74);
       renderer.shadowMap.enabled = false;
       renderer.setPixelRatio(1);
+      scaleIdx = 1;
       renderScale = 0.72;
       allocTargets();
 
@@ -528,20 +526,22 @@
       UI.wmode.textContent = slot === 3 ? 'MELEE' : 'THROWABLE';
       UI.magNum.textContent = slot === 3 ? '—' : (mod.grenadeCooldown > 0 ? '0' : '1');
       UI.resNum.textContent = '';
-      UI.reloadHint.textContent = slot === 3 ? 'F  INSPECT' : '';
+      UI.reloadHint.textContent = '';
     }
   }
 
   function updateUtilityView(dt) {
     mod.meleeCooldown = Math.max(0, mod.meleeCooldown - dt);
     mod.meleeSwing = Math.max(0, mod.meleeSwing - dt);
-    if (mod.inspect) mod.inspectTime += dt;
-    mod.inspectBlend = damp(mod.inspectBlend, mod.inspect ? 1 : 0, 10, dt);
+    // 已取消检视动作，保持状态关闭并减少每帧计算。
+    mod.inspect = false;
+    mod.inspectTime = 0;
+    mod.inspectBlend = 0;
     if (knifeVM && knifeVM.visible) {
       const k = clamp(1 - mod.meleeSwing / 0.42, 0, 1);
       const arc = Math.sin(k * Math.PI);
-      const inspectIn = mod.inspectBlend;
-      const inspectSway = mod.inspect ? Math.sin(mod.inspectTime * 2.4) * 0.08 : 0;
+      const inspectIn = 0;
+      const inspectSway = 0;
       knifeVM.rotation.z = -0.38 - arc * 1.22 + inspectIn * (0.62 + inspectSway);
       knifeVM.rotation.x = -0.22 + arc * 0.58 - inspectIn * 0.32;
       knifeVM.rotation.y = 0.23 + inspectIn * Math.sin(mod.inspectTime * 2.1) * 0.76;
@@ -549,29 +549,15 @@
       knifeVM.position.y = -0.17 + arc * 0.05 + inspectIn * 0.10;
       knifeVM.position.z = -0.78 + inspectIn * 0.16;
     }
-    // 类似 CS 的枪械检视：抬起当前枪械并向画面中心倾斜，
-    // 再持续施加轻微的展示旋转。偏移在基础动画之后叠加，
-    // 因此后坐力、呼吸摆动、换弹和开镜仍可正常工作。
-    if ((mod.slot === 1 || mod.slot === 2) && typeof vmSway !== 'undefined') {
-      const b = mod.inspectBlend;
-      const t = mod.inspectTime;
-      const w = typeof WEAPONS !== 'undefined' ? WEAPONS[player.weapon] : null;
-      if (w && w.vm && w.vm.group) {
-        w.vm.group.rotation.x += b * (-0.16 + Math.sin(t * 1.7) * 0.035);
-        w.vm.group.rotation.y += b * (0.34 + Math.sin(t * 1.15) * 0.14);
-        w.vm.group.rotation.z += b * (-0.20 + Math.sin(t * 1.45) * 0.05);
-      }
-      vmSway.position.x += b * 0.075;
-      vmSway.position.y += b * 0.12;
-      vmSway.position.z += b * 0.08;
-    }
     if (grenadeVM && grenadeVM.visible) {
       const pulse = 1 + Math.sin(performance.now() * 0.006) * 0.025;
       grenadeVM.scale.setScalar(pulse);
     }
-    document.querySelectorAll('#slots .slot').forEach((slot, index) => {
-      slot.classList.toggle('act', index === mod.slot - 1);
-    });
+    if (!mod.slotEls) mod.slotEls = document.querySelectorAll('#slots .slot');
+    if (mod._slotUi !== mod.slot) {
+      mod.slotEls.forEach((slot, index) => slot.classList.toggle('act', index === mod.slot - 1));
+      mod._slotUi = mod.slot;
+    }
   }
 
   function updateWaveUi() {
@@ -586,9 +572,9 @@
       : `LAST LIGHT // WAVE ${String(mod.wave).padStart(2, '0')}`;
     const objective = document.getElementById('objective');
     if (objective) objective.innerHTML = `<b id="killCount">${kills}</b> / 30 INFECTED`;
-    document.querySelectorAll('#slots .slot').forEach((slot, index) => {
-      slot.classList.toggle('act', index === mod.slot - 1);
-    });
+    if (!mod.slotEls) mod.slotEls = document.querySelectorAll('#slots .slot');
+    mod.slotEls.forEach((slot, index) => slot.classList.toggle('act', index === mod.slot - 1));
+    mod._slotUi = mod.slot;
   }
 
   function nextWave() {
@@ -616,7 +602,6 @@
 
   function meleeAttack() {
     if (typeof G === 'undefined' || !G.running || mod.meleeCooldown > 0 || typeof camera === 'undefined') return false;
-    if (mod.inspect) return true;
     mod.meleeCooldown = 0.42;
     mod.meleeSwing = 0.42;
     const dir = new THREE.Vector3();
@@ -635,18 +620,6 @@
     SFX.hitBeep(head);
     showHitmark(killed);
     return true;
-  }
-
-  function toggleInspect() {
-    if (typeof G === 'undefined' || !G.running) return;
-    if (mod.slot === 3 && !knifeVM) return;
-    if (typeof player !== 'undefined' && player.switching > 0) return;
-    if (mod.slot === 4) return;
-    if (mod.meleeSwing > 0) return;
-    mod.inspect = !mod.inspect;
-    mod.inspectTime = 0;
-    player.triggerHeld = false;
-    player.triggerReleased = true;
   }
 
   function throwGrenade() {
@@ -830,11 +803,6 @@
       if (typeof fireWeapon === 'function' && !mod.fireWrapped) {
         const baseFire = fireWeapon;
         fireWeapon = function () {
-          if (mod.inspect) {
-            mod.inspect = false;
-            mod.inspectTime = 0;
-            return false;
-          }
           if (mod.slot === 3) return meleeAttack();
           if (mod.slot === 4) {
             if (!player.triggerReleased) return false;
@@ -867,10 +835,6 @@
             event.stopImmediatePropagation();
             selectGunSlot(4);
             throwGrenade();
-          } else if (event.code === 'KeyF' && typeof G !== 'undefined' && G.running) {
-            event.preventDefault();
-            event.stopImmediatePropagation();
-            toggleInspect();
           }
         }, true);
         addEventListener('wheel', (event) => {
