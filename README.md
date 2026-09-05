@@ -1,18 +1,16 @@
-# Operation Ironhold
+# LAST LIGHT — Zombie District
 
-A complete first-person shooter that runs in a browser tab. One HTML file, no build step,
-no package manager, and not a single image, audio or model file on disk.
+A low-poly first-person zombie survival prototype that runs in a browser tab. The city,
+weapons, enemies and audio are generated at runtime; the renderer is vendored locally.
 
-**[Play it here](https://starknightt.github.io/operation-ironhold/)**
+**[Open the repository](https://github.com/XT19971005/Shooting)**
 
-![Gameplay](screenshots/gameplay.jpg)
-
-Ten hostiles hold a container yard in Sector 7. You have three minutes to clear it.
+Three waves of infected overrun a custom downtown block. Clear 30 targets before the clock runs out.
 
 The entire game — renderer setup, world generation, weapon handling, enemy AI, audio
 synthesis, post-processing and HUD — is about 6,500 lines of JavaScript and CSS inlined
-into a single 290 KB `index.html`. The only external resource is three.js r128, pulled
-from a CDN. Everything else is generated at runtime.
+into `index.html` plus the small `zombie-mode.js` gameplay layer. Three.js r128 is stored
+in `vendor/three.min.js`, so the game no longer depends on the old repository's CDN or images.
 
 It was built by an AI agent from five prompts, recorded verbatim in
 [PROMPTS.md](PROMPTS.md).
@@ -83,7 +81,6 @@ so the spray is something you can learn to hold down.
 
 ## Aiming
 
-![Sniper scope](screenshots/scope.jpg)
 
 Right click toggles ADS. Every weapon takes exactly 0.2s to settle in or out, tightens its
 spread, and costs 40% of your movement speed while held.
@@ -136,7 +133,6 @@ crack, a body and a chest thump, reloads, footsteps, impact sounds that differ b
 and flesh, the low-health heartbeat, and an ambient industrial hum with distant metal creaks
 on a random timer. There is a convolution reverb built from a generated impulse response.
 
-![Start screen](screenshots/menu.jpg)
 
 ## Performance
 
@@ -204,11 +200,12 @@ pixels thick every edge has to land on a whole device pixel or it smears.
 ## Repository layout
 
 ```
-index.html              the entire game
-PROMPTS.md              the prompts that specify it, verbatim
-screenshots/            images used by this README
-tools/test-harness.js   collision, weapon and AI test suite
-tools/autoplay-bot.js   pathfinding bot for unattended regression runs
+index.html              the playable game shell
+zombie-mode.js          Last Light gameplay/UI layer
+vendor/three.min.js     local Three.js r128 runtime
+index.original.html     baseline source used by the patch script
+scripts/                reproducible patch helper
+tools/                  development-only regression helpers
 ```
 
 The two files in `tools/` are development-only. Neither is referenced by `index.html`; they
