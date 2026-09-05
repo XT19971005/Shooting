@@ -18,12 +18,16 @@
     previousGun: 2,
     meleeCooldown: 0,
     meleeSwing: 0,
+    meleeSwingDuration: 0.38,
+    meleeHeavy: false,
     inspect: false,
     inspectTime: 0,
     inspectBlend: 0,
     wave: 1,
     waveKillTarget: 10,
     waveTransition: false,
+    waveBreakDuration: 5,
+    waveBreakRemaining: 0,
     patchErrors: [],
   });
 
@@ -152,6 +156,11 @@
         #objective{margin-top:4px;font-size:10px;letter-spacing:.16em;color:#a4b9ba}
         #objective b{color:var(--our-orange)}
         #zombieBadge{top:76px!important;border-color:rgba(255,155,84,.38)!important;background:rgba(16,25,30,.82)!important;color:var(--our-orange)!important;border-radius:999px!important;letter-spacing:.12em!important}
+        #waveBreak{position:fixed;left:50%;top:42%;z-index:18;min-width:260px;padding:18px 28px;transform:translate(-50%,-50%) scale(.94);border:1px solid rgba(116,215,208,.34);border-radius:14px;background:rgba(7,16,22,.88);box-shadow:0 18px 55px rgba(0,0,0,.38);text-align:center;pointer-events:none;opacity:0;transition:opacity .16s,transform .16s}
+        #waveBreak.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+        #waveBreak .wave-safe{font-size:10px;letter-spacing:.24em;color:var(--our-cyan)}
+        #waveBreak .wave-count{margin:5px 0 3px;font-size:58px;line-height:1;font-weight:800;color:#fff;text-shadow:0 0 22px rgba(116,215,208,.28)}
+        #waveBreak .wave-next{font-size:11px;letter-spacing:.12em;color:#a7b8b9}
         #mapWrap{left:20px;top:20px;padding:10px;border-radius:12px}
         #mapWrap .lbl{font-size:9px;letter-spacing:.14em;color:#9bb0b1}
         #minimap{width:142px;height:142px}
@@ -199,7 +208,9 @@
       const weaponRow = rows.find((row) => row.textContent.includes('1–4'));
       if (weaponRow) weaponRow.innerHTML = '<kbd>1–4</kbd> <span>手枪 · 步枪 · 战术刀 · 手雷</span>';
       const fireRow = rows.find((row) => row.textContent.includes('FIRE'));
-      if (fireRow) fireRow.innerHTML = '<kbd>LMB</kbd> <span>射击 · 挥刀 · 投掷</span>';
+      if (fireRow) fireRow.innerHTML = '<kbd>LMB</kbd> <span>射击 · 刀轻击 · 投掷</span>';
+      const aimRow = rows.find((row) => row.textContent.includes('AIM') || row.textContent.includes('开镜'));
+      if (aimRow) aimRow.innerHTML = '<kbd>RMB</kbd> <span>开镜 · 刀重击</span>';
     }
 
     const hud = document.getElementById('hud');
@@ -208,6 +219,12 @@
       badge.id = 'zombieBadge';
       badge.textContent = '最后一线 // 第 1 波';
       hud.appendChild(badge);
+    }
+    if (hud && !document.getElementById('waveBreak')) {
+      const waveBreak = document.createElement('div');
+      waveBreak.id = 'waveBreak';
+      waveBreak.innerHTML = '<div class="wave-safe">本波清除</div><div class="wave-count">5</div><div class="wave-next">下一波即将开始</div>';
+      hud.appendChild(waveBreak);
     }
   }
 
@@ -467,6 +484,55 @@
 
   let knifeVM = null;
   let grenadeVM = null;
+  let grenadeWorldTemplate = null;
+  let utilityModelsLoading = false;
+
+  function prepareModel(model, targetSize, rotation) {
+    const holder = new THREE.Group();
+    holder.add(model);
+    model.traverse((object) => {
+      if (!object.isMesh) return;
+      object.castShadow = false;
+      object.receiveShadow = false;
+      if (!object.material) return;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      for (const material of materials) {
+        if (material.map) material.map.encoding = THREE.sRGBEncoding;
+        material.needsUpdate = true;
+      }
+    });
+    if (rotation) holder.rotation.set(rotation.x || 0, rotation.y || 0, rotation.z || 0);
+    holder.updateMatrixWorld(true);
+    const size = new THREE.Box3().setFromObject(holder).getSize(new THREE.Vector3());
+    const scale = targetSize / Math.max(size.x, size.y, size.z, 0.0001);
+    holder.scale.setScalar(scale);
+    holder.updateMatrixWorld(true);
+    const center = new THREE.Box3().setFromObject(holder).getCenter(new THREE.Vector3());
+    holder.position.sub(center);
+    return holder;
+  }
+
+  function loadUtilityModels() {
+    if (utilityModelsLoading || !knifeVM || !grenadeVM || typeof THREE.GLTFLoader !== 'function') return;
+    utilityModelsLoading = true;
+    const loader = new THREE.GLTFLoader();
+    loader.load('./m9_bayonet_knife.glb', (gltf) => {
+      const knife = prepareModel(gltf.scene, 1.05, { y: Math.PI });
+      knife.name = 'M9BayonetModel';
+      knifeVM.clear();
+      knifeVM.add(knife);
+      mod.knifeModelReady = true;
+    }, undefined, (error) => reportError('加载 M9 刺刀模型', error));
+    loader.load('./m67_hand_grenade.glb', (gltf) => {
+      const grenade = prepareModel(gltf.scene, 0.28, { x: -0.10, y: 0.24, z: -0.12 });
+      grenade.name = 'M67GrenadeModel';
+      grenadeVM.clear();
+      grenadeVM.add(grenade);
+      grenadeWorldTemplate = grenade.clone(true);
+      mod.grenadeModelReady = true;
+    }, undefined, (error) => reportError('加载 M67 手雷模型', error));
+  }
+
   function buildUtilityViewmodels() {
     if (knifeVM || typeof vmRecoil === 'undefined') return;
     const steel = new THREE.MeshStandardMaterial({ color: 0xb7c2c8, roughness: 0.34, metalness: 0.76 });
@@ -522,11 +588,12 @@
     pommel.rotation.x = Math.PI / 2;
     knifeVM.add(pommel);
     const hand = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.13, 0.20), glove);
+    hand.name = 'UtilityHand';
     hand.position.set(0.03, -0.08, 0.30);
     hand.rotation.z = -0.08;
     knifeVM.add(hand);
     knifeVM.position.set(0.34, -0.22, -0.98);
-    knifeVM.rotation.set(-0.18, 0.12, -0.20);
+    knifeVM.rotation.set(-0.18, 0.12, -0.42);
     // 保持刀身轮廓清晰，同时不遮挡游戏中的准星。
     knifeVM.scale.setScalar(0.64);
     knifeVM.visible = false;
@@ -545,10 +612,11 @@
     pin.position.set(0.095, 0.14, 0.01);
     pin.rotation.x = Math.PI / 2;
     grenadeVM.add(pin);
-    grenadeVM.position.set(0.27, -0.16, -0.72);
+    grenadeVM.position.set(0.30, -0.18, -0.82);
     grenadeVM.rotation.set(-0.25, 0.14, -0.18);
     grenadeVM.visible = false;
     vmRecoil.add(grenadeVM);
+    loadUtilityModels();
   }
 
   function hideAllViewmodels() {
@@ -595,9 +663,10 @@
     if (typeof setADS === 'function') setADS(false);
     player.triggerHeld = false;
     player.triggerReleased = true;
+    player.clickBuf = 0;
     if (typeof UI !== 'undefined') {
       UI.wname.textContent = slot === 3 ? '战术刀' : '破片手雷';
-      UI.wmode.textContent = slot === 3 ? '近战' : '投掷物';
+      UI.wmode.textContent = slot === 3 ? '左键轻击 · 右键重击' : '左键投掷';
       UI.magNum.textContent = slot === 3 ? '—' : (mod.grenadeCooldown > 0 ? '0' : '1');
       UI.resNum.textContent = '';
       UI.reloadHint.textContent = '';
@@ -612,16 +681,17 @@
     mod.inspectTime = 0;
     mod.inspectBlend = 0;
     if (knifeVM && knifeVM.visible) {
-      const k = clamp(1 - mod.meleeSwing / 0.42, 0, 1);
-      const arc = Math.sin(k * Math.PI);
-      const inspectIn = 0;
-      const inspectSway = 0;
-      knifeVM.rotation.z = -0.20 - arc * 0.82 + inspectIn * (0.62 + inspectSway);
-      knifeVM.rotation.x = -0.18 + arc * 0.42 - inspectIn * 0.32;
-      knifeVM.rotation.y = 0.12 + inspectIn * Math.sin(mod.inspectTime * 2.1) * 0.76;
-      knifeVM.position.x = 0.34 - arc * 0.08 - inspectIn * 0.12;
-      knifeVM.position.y = -0.22 + arc * 0.04 + inspectIn * 0.10;
-      knifeVM.position.z = -0.98 + inspectIn * 0.16;
+      const k = clamp(1 - mod.meleeSwing / mod.meleeSwingDuration, 0, 1);
+      if (mod.meleeHeavy) {
+        const windup = Math.sin(clamp(k / 0.34, 0, 1) * Math.PI * 0.5);
+        const thrust = Math.sin(clamp((k - 0.24) / 0.76, 0, 1) * Math.PI);
+        knifeVM.rotation.set(-0.18 - windup * 0.32 + thrust * 0.18, 0.12 - windup * 0.42, -0.42 + windup * 0.24 - thrust * 0.18);
+        knifeVM.position.set(0.34 + windup * 0.10 - thrust * 0.24, -0.22 - windup * 0.06 + thrust * 0.10, -0.98 + windup * 0.22 - thrust * 0.30);
+      } else {
+        const arc = Math.sin(k * Math.PI);
+        knifeVM.rotation.set(-0.18 + arc * 0.42, 0.12 - arc * 0.18, -0.42 - arc * 0.88);
+        knifeVM.position.set(0.34 - arc * 0.17, -0.22 + arc * 0.08, -0.98 - arc * 0.08);
+      }
     }
     if (grenadeVM && grenadeVM.visible) {
       const pulse = 1 + Math.sin(performance.now() * 0.006) * 0.025;
@@ -637,54 +707,103 @@
   function updateWaveUi() {
     const cooldown = mod.grenadeCooldown > 0 ? 1 : 0;
     const kills = typeof G !== 'undefined' ? G.kills : 0;
-    const key = `${mod.wave}|${cooldown}|${kills}|${mod.slot}`;
+    const breakSecond = mod.waveTransition ? Math.max(1, Math.ceil(mod.waveBreakRemaining)) : 0;
+    const key = `${mod.wave}|${cooldown}|${kills}|${mod.slot}|${breakSecond}`;
     if (mod._waveUiKey === key) return;
     mod._waveUiKey = key;
     const badge = document.getElementById('zombieBadge');
-    if (badge) badge.textContent = cooldown
-      ? `最后一线 // 第 ${mod.wave} 波 // 手雷冷却`
-      : `最后一线 // 第 ${mod.wave} 波`;
+    if (badge) badge.textContent = mod.waveTransition
+      ? `第 ${mod.wave} 波已清除 // 休整 ${breakSecond} 秒`
+      : cooldown ? `最后一线 // 第 ${mod.wave} 波 // 手雷冷却` : `最后一线 // 第 ${mod.wave} 波`;
     const objective = document.getElementById('objective');
-    if (objective) objective.innerHTML = `<b id="killCount">${kills}</b> / ∞ 感染者`;
+    if (objective) objective.innerHTML = mod.waveTransition
+      ? `<b>${breakSecond}</b> 秒后开始第 ${mod.wave + 1} 波`
+      : `<b id="killCount">${kills}</b> / ∞ 感染者`;
     if (!mod.slotEls) mod.slotEls = document.querySelectorAll('#slots .slot');
     mod.slotEls.forEach((slot, index) => slot.classList.toggle('act', index === mod.slot - 1));
     mod._slotUi = mod.slot;
   }
 
-  function nextWave() {
-    if (mod.waveTransition || typeof enemies === 'undefined' || typeof spawnEnemies !== 'function') return;
-    mod.waveTransition = true;
-    mod.wave += 1;
+  function removeWaveEnemies() {
+    if (typeof enemies === 'undefined') return;
     for (const enemy of enemies) {
       if (enemy.obj && typeof scene !== 'undefined') scene.remove(enemy.obj);
       if (enemy.tag && enemy.tag.tex && enemy.tag.tex.dispose) enemy.tag.tex.dispose();
     }
     enemies.length = 0;
     if (typeof enemyHitMeshes !== 'undefined') enemyHitMeshes.length = 0;
+  }
+
+  function updateWaveBreakUi() {
+    const overlay = document.getElementById('waveBreak');
+    if (!overlay) return;
+    overlay.classList.toggle('on', mod.waveTransition);
+    const count = overlay.querySelector('.wave-count');
+    if (count) count.textContent = String(mod.waveTransition ? Math.max(1, Math.ceil(mod.waveBreakRemaining)) : mod.waveBreakDuration);
+    const next = overlay.querySelector('.wave-next');
+    if (next) next.textContent = `第 ${mod.wave + 1} 波即将开始`;
+  }
+
+  function beginWaveBreak() {
+    if (mod.waveTransition || typeof enemies === 'undefined' || typeof spawnEnemies !== 'function') return;
+    mod.waveTransition = true;
+    mod.waveBreakRemaining = mod.waveBreakDuration;
+    removeWaveEnemies();
+    if (typeof player !== 'undefined') {
+      player.triggerHeld = false;
+      player.triggerReleased = true;
+      player.clickBuf = 0;
+    }
+    if (typeof setADS === 'function') setADS(false);
+    if (typeof G !== 'undefined') {
+      G.grace = mod.waveBreakDuration + 1.5;
+      G.time = 180;
+    }
+    updateWaveBreakUi();
+    updateWaveUi();
+    if (typeof pushComms === 'function') pushComms('最后一线', `第 ${mod.wave} 波已清除，准备下一波`);
+  }
+
+  function startNextWave() {
+    mod.wave += 1;
     // 无尽模式：每两波增加一组 10 名感染者，最多保留 4 组，避免敌人数量无限拖垮浏览器。
     const batchCount = Math.min(4, 1 + Math.floor(mod.wave / 2));
     for (let batch = 0; batch < batchCount; batch += 1) spawnEnemies();
     mod.waveKillTarget += batchCount * 10;
-    setTimeout(() => {
-      decorateAllEnemies();
-      mod.waveTransition = false;
-      if (typeof G !== 'undefined') {
-        G.grace = 2.2;
-        G.time = 180;
-      }
-      updateWaveUi();
-      if (typeof pushComms === 'function') pushComms('最后一线', `第 ${mod.wave} 波 — 感染者来袭`);
-    }, 0);
+    decorateAllEnemies();
+    mod.waveTransition = false;
+    mod.waveBreakRemaining = 0;
+    if (typeof G !== 'undefined') {
+      G.grace = 2.2;
+      G.time = 180;
+    }
+    updateWaveBreakUi();
+    updateWaveUi();
+    if (typeof pushComms === 'function') pushComms('最后一线', `第 ${mod.wave} 波 — 感染者来袭`);
   }
 
-  function meleeAttack() {
+  function updateWaveBreak(dt) {
+    if (!mod.waveTransition) return;
+    mod.waveBreakRemaining = Math.max(0, mod.waveBreakRemaining - dt);
+    const second = Math.ceil(mod.waveBreakRemaining);
+    if (mod._waveBreakSecond !== second) {
+      mod._waveBreakSecond = second;
+      updateWaveBreakUi();
+      updateWaveUi();
+    }
+    if (mod.waveBreakRemaining <= 0) startNextWave();
+  }
+
+  function meleeAttack(heavy) {
     if (typeof G === 'undefined' || !G.running || mod.meleeCooldown > 0 || typeof camera === 'undefined') return false;
-    mod.meleeCooldown = 0.42;
-    mod.meleeSwing = 0.42;
+    mod.meleeHeavy = !!heavy;
+    mod.meleeSwingDuration = heavy ? 0.82 : 0.38;
+    mod.meleeCooldown = heavy ? 0.88 : 0.40;
+    mod.meleeSwing = mod.meleeSwingDuration;
     const dir = new THREE.Vector3();
     camera.getWorldDirection(dir);
     shootRay.set(camera.position, dir);
-    shootRay.far = 2.35;
+    shootRay.far = heavy ? 2.48 : 2.18;
     for (const enemy of (typeof enemies !== 'undefined' ? enemies : [])) if (!enemy.dead) enemy.obj.updateMatrixWorld(true);
     const hits = shootRay.intersectObjects(typeof enemyHitMeshes !== 'undefined' ? enemyHitMeshes : [], false);
     const hit = hits.find((entry) => entry.object && entry.object.userData && entry.object.userData.enemy && !entry.object.userData.enemy.dead);
@@ -692,7 +811,8 @@
     const data = hit.object.userData;
     const enemy = data.enemy;
     const head = data.part === 'head';
-    const killed = damageEnemy(enemy, head ? 120 : 72, head, dir, hit.point);
+    const damage = heavy ? (head ? 150 : 110) : (head ? 88 : 55);
+    const killed = damageEnemy(enemy, damage, head, dir, hit.point);
     G.hits++;
     SFX.hitBeep(head);
     showHitmark(killed);
@@ -702,7 +822,7 @@
   function throwGrenade() {
     if (typeof G === 'undefined' || !G.running || mod.grenadeCooldown > 0 || typeof camera === 'undefined') return;
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
-    const mesh = new THREE.Mesh(grenadeGeo, grenadeMat);
+    const mesh = grenadeWorldTemplate ? grenadeWorldTemplate.clone(true) : new THREE.Mesh(grenadeGeo, grenadeMat);
     mesh.position.copy(camera.position).addScaledVector(dir, 0.75);
     scene.add(mesh);
     grenadeMeshes.push({ mesh, velocity: dir.multiplyScalar(14).add(new THREE.Vector3(0, 4.8, 0)), life: 0 });
@@ -757,6 +877,72 @@
     updateWaveUi();
   }
 
+  function scheduleBrowserSelfTest() {
+    const params = new URLSearchParams(location.search);
+    if (!params.has('test') || mod.selfTestScheduled) return;
+    mod.selfTestScheduled = true;
+
+    if (params.has('wavebreak')) {
+      setTimeout(() => beginWaveBreak(), 750);
+      return;
+    }
+    if (!params.has('selftest')) return;
+
+    setTimeout(() => {
+      const result = {};
+      if (typeof G === 'undefined' || !G.running || typeof player === 'undefined') {
+        document.body.dataset.selftest = JSON.stringify({ ready: false });
+        return;
+      }
+
+      const inputTarget = document.getElementById('c') || document.body;
+      selectGunSlot(1);
+      player.fireCooldown = 0;
+      player.reloadT = 0;
+      const shotsBefore = G.shots;
+      inputTarget.dispatchEvent(new MouseEvent('mousedown', { button: 0, bubbles: true, cancelable: true }));
+      inputTarget.dispatchEvent(new MouseEvent('mouseup', { button: 0, bubbles: true, cancelable: true }));
+
+      setTimeout(() => {
+        result.gunShot = G.shots > shotsBefore;
+
+        selectGunSlot(3);
+        setADS(false);
+        mod.meleeCooldown = 0;
+        inputTarget.dispatchEvent(new MouseEvent('mousedown', { button: 2, bubbles: true, cancelable: true }));
+        result.knifeHeavy = mod.meleeHeavy && mod.meleeSwingDuration === 0.82;
+        result.knifeRightClickDoesNotAim = !player.ads;
+
+        mod.meleeCooldown = 0;
+        inputTarget.dispatchEvent(new MouseEvent('mousedown', { button: 0, bubbles: true, cancelable: true }));
+        result.knifeLight = !mod.meleeHeavy && mod.meleeSwingDuration === 0.38;
+
+        const grenadesBefore = mod.grenadesThrown;
+        inputTarget.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit4', bubbles: true, cancelable: true }));
+        result.grenadeSelectedWithoutThrow = mod.slot === 4 && mod.grenadesThrown === grenadesBefore;
+        inputTarget.dispatchEvent(new MouseEvent('mousedown', { button: 0, bubbles: true, cancelable: true }));
+        inputTarget.dispatchEvent(new MouseEvent('mouseup', { button: 0, bubbles: true, cancelable: true }));
+
+        setTimeout(() => {
+          result.grenadeThrownByClick = mod.grenadesThrown === grenadesBefore + 1;
+          const waveBefore = mod.wave;
+          beginWaveBreak();
+          result.breakStarted = mod.waveTransition && mod.waveBreakRemaining > 4.8 && enemies.length === 0;
+          result.breakOverlayShown = document.getElementById('waveBreak').classList.contains('on');
+          mod.waveBreakRemaining = 0.05;
+
+          setTimeout(() => {
+            result.nextWaveStarted = !mod.waveTransition && mod.wave === waveBefore + 1 && enemies.length === 20;
+            result.modelsLoaded = !!mod.knifeModelReady && !!mod.grenadeModelReady;
+            result.patchErrors = mod.patchErrors.slice();
+            result.ready = Object.values(result).every((value) => value === true || (Array.isArray(value) && value.length === 0));
+            document.body.dataset.selftest = JSON.stringify(result);
+          }, 180);
+        }, 120);
+      }, 140);
+    }, 850);
+  }
+
   function installPatches() {
     try {
       patchUi();
@@ -776,6 +962,9 @@
             : weapon.id === 'shotgun' ? '泵动式'
               : weapon.id === 'sniper' ? '栓动式' : '半自动';
           UI.reloadHint.textContent = zhText(UI.reloadHint.textContent);
+          if (!mod.slotEls) mod.slotEls = document.querySelectorAll('#slots .slot');
+          mod.slotEls.forEach((slot, index) => slot.classList.toggle('act', index === mod.slot - 1));
+          mod._slotUi = mod.slot;
         };
         mod.zhAmmoWrapped = true;
       }
@@ -867,12 +1056,17 @@
           mod.previousGun = 2;
           mod.meleeCooldown = 0;
           mod.meleeSwing = 0;
+          mod.meleeSwingDuration = 0.38;
+          mod.meleeHeavy = false;
           mod.inspect = false;
           mod.inspectTime = 0;
           mod.inspectBlend = 0;
           mod.wave = 1;
           mod.waveKillTarget = 10;
           mod.waveTransition = false;
+          mod.waveBreakRemaining = 0;
+          mod._waveBreakSecond = null;
+          updateWaveBreakUi();
           baseReset();
           setTimeout(() => {
             decorateAllEnemies();
@@ -889,7 +1083,7 @@
           // 基础版本在击杀数达到 10 时就判定胜利，这里改为无尽波次，
           // 每波达到目标后继续生成更大的感染者编队。
           if (win && !mod.waveTransition && G.kills >= mod.waveKillTarget) {
-            nextWave();
+            beginWaveBreak();
             return;
           }
           // 基础脚本在击杀数达到 10 后每次击杀都会尝试结束游戏；
@@ -909,7 +1103,7 @@
       if (typeof fireWeapon === 'function' && !mod.fireWrapped) {
         const baseFire = fireWeapon;
         fireWeapon = function () {
-          if (mod.slot === 3) return meleeAttack();
+          if (mod.slot === 3) return meleeAttack(false);
           if (mod.slot === 4) {
             if (!player.triggerReleased) return false;
             player.triggerReleased = false;
@@ -940,7 +1134,26 @@
             event.preventDefault();
             event.stopImmediatePropagation();
             selectGunSlot(4);
-            throwGrenade();
+          }
+        }, true);
+        addEventListener('mousedown', (event) => {
+          if (typeof G === 'undefined' || !G.running || mod.slot !== 3) return;
+          if (event.button !== 0 && event.button !== 2) return;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          player.triggerHeld = false;
+          player.triggerReleased = true;
+          player.clickBuf = 0;
+          meleeAttack(event.button === 2);
+        }, true);
+        addEventListener('mouseup', (event) => {
+          if (mod.slot !== 3 || (event.button !== 0 && event.button !== 2)) return;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          if (typeof player !== 'undefined') {
+            player.triggerHeld = false;
+            player.triggerReleased = true;
+            player.clickBuf = 0;
           }
         }, true);
         addEventListener('wheel', (event) => {
@@ -962,12 +1175,14 @@
           const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
           last = now;
           updateGrenades(dt);
+          updateWaveBreak(dt);
           if (typeof G !== 'undefined' && G.running && G.time <= 0) G.time = 180;
           baseFrame(now);
           updateUtilityView(dt);
         };
         mod.frameWrapped = true;
       }
+      scheduleBrowserSelfTest();
       mod.ready = true;
     } catch (error) {
       reportError('install patches', error);
