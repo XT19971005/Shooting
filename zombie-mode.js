@@ -52,18 +52,91 @@
     }
   }
 
+  const zhWeaponNames = {
+    rifle: 'M4 步枪', shotgun: 'KS-12 霰弹枪', pistol: 'P-9 手枪', sniper: 'SR-7 狙击枪',
+  };
+  function zhText(value) {
+    let text = String(value || '');
+    const pairs = [
+      ['FULL AUTO', '全自动'], ['SEMI AUTO', '半自动'], ['PUMP ACTION', '泵动式'],
+      ['BOLT ACTION', '栓动式'], ['NO AMMO', '没有弹药'], ['PRESS R TO RELOAD', '按 R 换弹'],
+      ['LAST LIGHT', '最后一线'], ['GRENADE COOLDOWN', '手雷冷却'], ['INFECTED INBOUND', '感染者来袭'],
+      ['SHOTS FIRED', '发现枪声'], ['CONTACT, MOVING TO SUPPORT', '发现目标，前往支援'],
+      ['GUNFIRE, SWEEPING', '发现枪声，正在搜索'], ['RELOADING — COVER ME', '正在换弹，掩护我'],
+      ['MAG OUT', '弹匣已空'], ['CHANGING MAGS', '更换弹匣'], ['COMMAND', '指挥部'],
+      ['NORTH-EAST', '东北'], ['SOUTH-EAST', '东南'], ['SOUTH-WEST', '西南'], ['NORTH-WEST', '西北'],
+      ['NORTH', '北'], ['EAST', '东'], ['SOUTH', '南'], ['WEST', '西'],
+    ];
+    for (const [from, to] of pairs) text = text.split(from).join(to);
+    return text.replace(/INFECTED-(\d+)/g, '感染者-$1');
+  }
+
   function patchUi() {
-    document.title = 'LAST LIGHT — Zombie District';
+    document.title = '最后一线 — 僵尸街区';
     replaceText(document.body, [
-      ['IRONHOLD // SECTOR 7', 'LAST LIGHT // ZOMBIE DISTRICT'],
-      ['OPERATION IRONHOLD — Warehouse District', 'LAST LIGHT — Zombie District'],
-      ['CONTAINER YARD 04', 'DOWNTOWN BLOCK 04'],
-      ['GRID 118-042', 'EVAC ROUTE 04'],
-      ['10 HOSTILES · 03:00 ON THE CLOCK', 'WAVE 01 · 10 INFECTED · 03:00'],
-      ['CLASSIFIED // TASK FORCE IRONHOLD WAREHOUSE', 'OUTBREAK RESPONSE // LAST LIGHT'],
-      ['TASK FORCE IRONHOLD WAREHOUSE', 'LAST LIGHT RESPONSE UNIT'],
-      ['DISTRICT SECTOR 7 — HOSTILE', 'DOWNTOWN DISTRICT — INFECTED'],
-      ['ELIMINATE ALL 10 HOSTILES BEFORE THE CLOCK RUNS OUT', 'CLEAR THE BLOCK BEFORE THE CLOCK RUNS OUT'],
+      ['IRONHOLD // SECTOR 7', '最后一线 // 僵尸街区'],
+      ['OPERATION IRONHOLD — Warehouse District', '最后一线 — 僵尸街区'],
+      ['CONTAINER YARD 04', '市中心街区 04'],
+      ['GRID 118-042', '撤离路线 04'],
+      ['10 HOSTILES · 03:00 ON THE CLOCK', '第一波 · 10 名感染者 · 03:00'],
+      ['CLASSIFIED // TASK FORCE IRONHOLD WAREHOUSE', '疫情响应 // 最后一线'],
+      ['TASK FORCE IRONHOLD WAREHOUSE', '最后一线响应小组'],
+      ['DISTRICT SECTOR 7 — HOSTILE', '市中心街区 — 感染者'],
+      ['ELIMINATE ALL 10 HOSTILES BEFORE THE CLOCK RUNS OUT', '清理街区，迎接下一波'],
+      ['LAST LIGHT // ZOMBIE DISTRICT', '最后一线 // 僵尸街区'],
+      ['LAST LIGHT — Zombie District', '最后一线 — 僵尸街区'],
+      ['DOWNTOWN BLOCK 04', '市中心街区 04'],
+      ['EVAC ROUTE 04', '撤离路线 04'],
+      ['WAVE 01 · 10 INFECTED · 03:00', '第 1 波 · 10 名感染者 · 03:00'],
+      ['OUTBREAK RESPONSE // LAST LIGHT', '疫情响应 // 最后一线'],
+      ['LAST LIGHT RESPONSE UNIT', '最后一线响应小组'],
+      ['DOWNTOWN DISTRICT — INFECTED', '市中心街区 — 感染者'],
+      ['DOWNTOWN BLOCK — INFECTED', '市中心街区 — 感染者'],
+      ['TACTICAL', '战术地图'],
+      ['Tactical', '战术地图'],
+      ['SECTOR 7', '第 7 区'],
+      ['VITALS', '生命值'],
+      ['Vitals', '生命值'],
+      ['ARMOR', '护甲'],
+      ['Armor', '护甲'],
+      ['PAUSED', '已暂停'],
+      ['CLICK TO RESUME', '点击继续'],
+      ['ZOMBIE', '僵尸'],
+      ['DISTRICT', '街区'],
+      ['MOVE', '移动'],
+      ['LOOK', '视角'],
+      ['FIRE MODE', '射击模式'],
+      ['FIRE', '射击'],
+      ['AIM DOWN SIGHTS', '开镜瞄准'],
+      ['SPRINT · HOLD BREATH', '冲刺 · 屏息'],
+      ['JUMP · DOUBLE · MANTLE', '跳跃 · 二段跳 · 翻越'],
+      ['CROUCH', '蹲下'],
+      ['RELOAD', '换弹'],
+      ['WEAPONS', '武器'],
+      ['MOUSE', '鼠标'],
+      ['LMB', '鼠标左键'],
+      ['RMB', '鼠标右键'],
+      ['SHIFT', 'Shift'],
+      ['SPACE', '空格'],
+      ['CTRL', 'Ctrl'],
+      ['ESC', 'Esc'],
+      ['PAUSE', '暂停'],
+      ['CLEAR THE BLOCK BEFORE THE CLOCK RUNS OUT', '清理街区，迎接下一波'],
+      ['MISSION REPORT', '任务报告'],
+      ['MISSION FAILED', '任务失败'],
+      ['ELIMINATIONS', '击杀数'],
+      ['HEADSHOTS', '爆头数'],
+      ['ACCURACY', '命中率'],
+      ['TIME SURVIVED', '生存时间'],
+      ['REDEPLOY', '重新开始'],
+      ['LOADING ORDNANCE…', '正在加载装备…'],
+      ['HOLD BREATH', '屏息'],
+      ['M4 CARBINE', 'M4 步枪'],
+      ['KS-12 PUMP', 'KS-12 霰弹枪'],
+      ['P-9 SIDEARM', 'P-9 手枪'],
+      ['SR-7 LONGBOW', 'SR-7 狙击枪'],
+      ['FULL AUTO', '全自动'],
+      ['PRESS TO START', '点击开始'],
     ]);
 
     if (!document.getElementById('ourUiStyle')) {
@@ -108,32 +181,32 @@
       document.head.appendChild(style);
     }
 
-    const slotNames = ['P-9 PISTOL', 'M4 RIFLE', 'COMBAT KNIFE', 'FRAG GRENADE'];
+    const slotNames = ['P-9 手枪', 'M4 步枪', '战术刀', '破片手雷'];
     document.querySelectorAll('#slots .slot').forEach((slot, index) => {
       const label = slot.querySelector('span');
       if (label && slotNames[index]) label.textContent = slotNames[index];
       slot.dataset.slot = String(index + 1);
     });
     const mapMode = document.getElementById('mapMode');
-    if (mapMode) mapMode.textContent = 'DOWNTOWN';
+    if (mapMode) mapMode.textContent = '市中心';
     const objective = document.getElementById('objective');
-    if (objective) objective.innerHTML = '<b id="killCount">0</b> / ∞ INFECTED';
+    if (objective) objective.innerHTML = '<b id="killCount">0</b> / ∞ 感染者';
     const endSub = document.getElementById('endSub');
-    if (endSub) endSub.textContent = 'DOWNTOWN BLOCK — LAST LIGHT';
+    if (endSub) endSub.textContent = '市中心街区 — 最后一线';
     const startKeys = document.querySelector('.keys');
     if (startKeys) {
       const rows = [...startKeys.querySelectorAll('.key')];
       const weaponRow = rows.find((row) => row.textContent.includes('1–4'));
-      if (weaponRow) weaponRow.innerHTML = '<kbd>1–4</kbd> <span>PISTOL · RIFLE · KNIFE · GRENADE</span>';
+      if (weaponRow) weaponRow.innerHTML = '<kbd>1–4</kbd> <span>手枪 · 步枪 · 战术刀 · 手雷</span>';
       const fireRow = rows.find((row) => row.textContent.includes('FIRE'));
-      if (fireRow) fireRow.innerHTML = '<kbd>LMB</kbd> <span>FIRE · KNIFE SWING · THROW</span>';
+      if (fireRow) fireRow.innerHTML = '<kbd>LMB</kbd> <span>射击 · 挥刀 · 投掷</span>';
     }
 
     const hud = document.getElementById('hud');
     if (hud && !document.getElementById('zombieBadge')) {
       const badge = document.createElement('div');
       badge.id = 'zombieBadge';
-      badge.textContent = 'LAST LIGHT // WAVE 01';
+      badge.textContent = '最后一线 // 第 1 波';
       hud.appendChild(badge);
     }
   }
@@ -307,7 +380,7 @@
       enemy.zombieDecorated = true;
       enemy.upper = false;
       enemy.obj.position.y = 0;
-      enemy.name = 'INFECTED-' + String(index + 1).padStart(2, '0');
+      enemy.name = '感染者-' + String(index + 1).padStart(2, '0');
       enemy.zombieAttackT = 0.35 + index * 0.04;
       enemy.zombiePhase = index * 0.7;
       if (enemy.p && enemy.p.gun) enemy.p.gun.visible = false;
@@ -523,8 +596,8 @@
     player.triggerHeld = false;
     player.triggerReleased = true;
     if (typeof UI !== 'undefined') {
-      UI.wname.textContent = slot === 3 ? 'TACTICAL KNIFE' : 'FRAG GRENADE';
-      UI.wmode.textContent = slot === 3 ? 'MELEE' : 'THROWABLE';
+      UI.wname.textContent = slot === 3 ? '战术刀' : '破片手雷';
+      UI.wmode.textContent = slot === 3 ? '近战' : '投掷物';
       UI.magNum.textContent = slot === 3 ? '—' : (mod.grenadeCooldown > 0 ? '0' : '1');
       UI.resNum.textContent = '';
       UI.reloadHint.textContent = '';
@@ -569,10 +642,10 @@
     mod._waveUiKey = key;
     const badge = document.getElementById('zombieBadge');
     if (badge) badge.textContent = cooldown
-      ? `LAST LIGHT // WAVE ${String(mod.wave).padStart(2, '0')} // GRENADE COOLDOWN`
-      : `LAST LIGHT // WAVE ${String(mod.wave).padStart(2, '0')}`;
+      ? `最后一线 // 第 ${mod.wave} 波 // 手雷冷却`
+      : `最后一线 // 第 ${mod.wave} 波`;
     const objective = document.getElementById('objective');
-    if (objective) objective.innerHTML = `<b id="killCount">${kills}</b> / ∞ INFECTED`;
+    if (objective) objective.innerHTML = `<b id="killCount">${kills}</b> / ∞ 感染者`;
     if (!mod.slotEls) mod.slotEls = document.querySelectorAll('#slots .slot');
     mod.slotEls.forEach((slot, index) => slot.classList.toggle('act', index === mod.slot - 1));
     mod._slotUi = mod.slot;
@@ -600,7 +673,7 @@
         G.time = 180;
       }
       updateWaveUi();
-      if (typeof pushComms === 'function') pushComms('LAST LIGHT', `WAVE ${String(mod.wave).padStart(2, '0')} — INFECTED INBOUND`);
+      if (typeof pushComms === 'function') pushComms('最后一线', `第 ${mod.wave} 波 — 感染者来袭`);
     }, 0);
   }
 
@@ -690,6 +763,28 @@
       buildOurLiteScene();
       decorateAllEnemies();
       buildUtilityViewmodels();
+
+      if (typeof updateAmmoUI === 'function' && !mod.zhAmmoWrapped) {
+        const baseAmmoUi = updateAmmoUI;
+        updateAmmoUI = function () {
+          baseAmmoUi();
+          if (typeof UI === 'undefined' || typeof player === 'undefined' || typeof WEAPONS === 'undefined') return;
+          const weapon = WEAPONS[player.weapon];
+          if (!weapon) return;
+          UI.wname.textContent = zhWeaponNames[weapon.id] || zhText(weapon.name);
+          UI.wmode.textContent = weapon.id === 'rifle' ? (weapon.semi ? '半自动' : '全自动')
+            : weapon.id === 'shotgun' ? '泵动式'
+              : weapon.id === 'sniper' ? '栓动式' : '半自动';
+          UI.reloadHint.textContent = zhText(UI.reloadHint.textContent);
+        };
+        mod.zhAmmoWrapped = true;
+      }
+
+      if (typeof pushComms === 'function' && !mod.zhCommsWrapped) {
+        const basePushComms = pushComms;
+        pushComms = function (who, text) { basePushComms(zhText(who), zhText(text)); };
+        mod.zhCommsWrapped = true;
+      }
 
       // 查询参数测试模式用于保持浏览器自动测试稳定，并兼容不支持鼠标锁定的环境。
       if (new URLSearchParams(location.search).has('test') && !mod.testMode && typeof requestLock === 'function') {
@@ -801,6 +896,10 @@
           // 无尽模式只在达到当前波次目标时换波，其他情况直接拦截。
           if (win) return;
           baseEnd(win);
+          const endTitle = document.getElementById('endTitle');
+          const endTag = document.getElementById('endTag');
+          if (endTitle) endTitle.textContent = win ? '街区已清除' : (player.dead ? '行动中阵亡' : '时间耗尽');
+          if (endTag) endTag.textContent = win ? '任务报告 // 成功' : '任务报告 // 失败';
           const score = document.getElementById('sKills');
           if (score) score.innerHTML = G.kills + '<span>/∞</span>';
         };
