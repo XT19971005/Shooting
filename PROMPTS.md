@@ -1,7 +1,7 @@
-# Prompts
+# 提示词记录
 
-The prompts that specify the game, in the order they were given. Wording is unedited, typos
-included.
+以下按收到顺序保存最初的游戏需求。代码块中的英文原文保持不改，便于追溯设计来源；
+文件外的说明和标题已改为中文。
 
 ---
 
