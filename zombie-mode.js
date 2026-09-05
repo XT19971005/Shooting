@@ -22,7 +22,7 @@
     inspectTime: 0,
     inspectBlend: 0,
     wave: 1,
-    waveCount: 3,
+    waveKillTarget: 10,
     waveTransition: false,
     patchErrors: [],
   });
@@ -117,7 +117,7 @@
     const mapMode = document.getElementById('mapMode');
     if (mapMode) mapMode.textContent = 'DOWNTOWN';
     const objective = document.getElementById('objective');
-    if (objective) objective.innerHTML = '<b id="killCount">0</b> / 30 INFECTED';
+    if (objective) objective.innerHTML = '<b id="killCount">0</b> / ∞ INFECTED';
     const endSub = document.getElementById('endSub');
     if (endSub) endSub.textContent = 'DOWNTOWN BLOCK — LAST LIGHT';
     const startKeys = document.querySelector('.keys');
@@ -218,7 +218,7 @@
       renderer.shadowMap.enabled = false;
       renderer.setPixelRatio(1);
       scaleIdx = 1;
-      renderScale = 0.72;
+      renderScale = SCALE_STEPS[scaleIdx];
       allocTargets();
 
       const groundMat = new THREE.MeshStandardMaterial({ color: 0x263238, roughness: 0.98, metalness: 0.02 });
@@ -418,16 +418,17 @@
     });
     bladeGeo.translate(0, 0, -0.0375);
     const blade = new THREE.Mesh(bladeGeo, steel);
-    blade.position.set(0, 0.00, -0.19);
-    blade.rotation.y = -0.08;
+    // 刀身沿枪口方向（-Z）延伸，护手在后方；原来沿 Y 轴建模会让刀身横着穿出画面。
+    blade.position.set(0, 0.00, 0.00);
+    blade.rotation.set(-Math.PI * 0.5, -0.08, 0);
     knifeVM.add(blade);
-    const fuller = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.36, 0.012), dark);
-    fuller.position.set(-0.005, 0.24, -0.235);
-    fuller.rotation.z = -0.025;
+    const fuller = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.012, 0.36), dark);
+    fuller.position.set(-0.005, -0.038, -0.22);
+    fuller.rotation.y = -0.025;
     knifeVM.add(fuller);
-    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.44, 0.010), new THREE.MeshStandardMaterial({ color: 0xe7eef0, roughness: 0.22, metalness: 0.84 }));
-    edge.position.set(0.049, 0.27, -0.236);
-    edge.rotation.z = -0.11;
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.010, 0.44), new THREE.MeshStandardMaterial({ color: 0xe7eef0, roughness: 0.22, metalness: 0.84 }));
+    edge.position.set(0.049, -0.003, -0.27);
+    edge.rotation.y = -0.11;
     knifeVM.add(edge);
     const guard = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.048, 0.072), dark);
     guard.position.set(0, -0.005, 0.025);
@@ -451,10 +452,10 @@
     hand.position.set(0.03, -0.08, 0.30);
     hand.rotation.z = -0.08;
     knifeVM.add(hand);
-    knifeVM.position.set(0.30, -0.17, -0.78);
-    knifeVM.rotation.set(-0.28, 0.18, -0.30);
+    knifeVM.position.set(0.34, -0.22, -0.98);
+    knifeVM.rotation.set(-0.18, 0.12, -0.20);
     // 保持刀身轮廓清晰，同时不遮挡游戏中的准星。
-    knifeVM.scale.setScalar(0.82);
+    knifeVM.scale.setScalar(0.64);
     knifeVM.visible = false;
     vmRecoil.add(knifeVM);
 
@@ -542,12 +543,12 @@
       const arc = Math.sin(k * Math.PI);
       const inspectIn = 0;
       const inspectSway = 0;
-      knifeVM.rotation.z = -0.38 - arc * 1.22 + inspectIn * (0.62 + inspectSway);
-      knifeVM.rotation.x = -0.22 + arc * 0.58 - inspectIn * 0.32;
-      knifeVM.rotation.y = 0.23 + inspectIn * Math.sin(mod.inspectTime * 2.1) * 0.76;
-      knifeVM.position.x = 0.30 - arc * 0.12 - inspectIn * 0.12;
-      knifeVM.position.y = -0.17 + arc * 0.05 + inspectIn * 0.10;
-      knifeVM.position.z = -0.78 + inspectIn * 0.16;
+      knifeVM.rotation.z = -0.20 - arc * 0.82 + inspectIn * (0.62 + inspectSway);
+      knifeVM.rotation.x = -0.18 + arc * 0.42 - inspectIn * 0.32;
+      knifeVM.rotation.y = 0.12 + inspectIn * Math.sin(mod.inspectTime * 2.1) * 0.76;
+      knifeVM.position.x = 0.34 - arc * 0.08 - inspectIn * 0.12;
+      knifeVM.position.y = -0.22 + arc * 0.04 + inspectIn * 0.10;
+      knifeVM.position.z = -0.98 + inspectIn * 0.16;
     }
     if (grenadeVM && grenadeVM.visible) {
       const pulse = 1 + Math.sin(performance.now() * 0.006) * 0.025;
@@ -571,7 +572,7 @@
       ? `LAST LIGHT // WAVE ${String(mod.wave).padStart(2, '0')} // GRENADE COOLDOWN`
       : `LAST LIGHT // WAVE ${String(mod.wave).padStart(2, '0')}`;
     const objective = document.getElementById('objective');
-    if (objective) objective.innerHTML = `<b id="killCount">${kills}</b> / 30 INFECTED`;
+    if (objective) objective.innerHTML = `<b id="killCount">${kills}</b> / ∞ INFECTED`;
     if (!mod.slotEls) mod.slotEls = document.querySelectorAll('#slots .slot');
     mod.slotEls.forEach((slot, index) => slot.classList.toggle('act', index === mod.slot - 1));
     mod._slotUi = mod.slot;
@@ -587,13 +588,16 @@
     }
     enemies.length = 0;
     if (typeof enemyHitMeshes !== 'undefined') enemyHitMeshes.length = 0;
-    spawnEnemies();
+    // 无尽模式：每两波增加一组 10 名感染者，最多保留 4 组，避免敌人数量无限拖垮浏览器。
+    const batchCount = Math.min(4, 1 + Math.floor(mod.wave / 2));
+    for (let batch = 0; batch < batchCount; batch += 1) spawnEnemies();
+    mod.waveKillTarget += batchCount * 10;
     setTimeout(() => {
       decorateAllEnemies();
       mod.waveTransition = false;
       if (typeof G !== 'undefined') {
         G.grace = 2.2;
-        G.time = Math.min(180, G.time + 35);
+        G.time = 180;
       }
       updateWaveUi();
       if (typeof pushComms === 'function') pushComms('LAST LIGHT', `WAVE ${String(mod.wave).padStart(2, '0')} — INFECTED INBOUND`);
@@ -772,6 +776,7 @@
           mod.inspectTime = 0;
           mod.inspectBlend = 0;
           mod.wave = 1;
+          mod.waveKillTarget = 10;
           mod.waveTransition = false;
           baseReset();
           setTimeout(() => {
@@ -786,16 +791,18 @@
       if (typeof endGame === 'function' && !mod.endWrapped) {
         const baseEnd = endGame;
         endGame = function (win) {
-          // 基础版本在击杀数达到 10 时就判定胜利，这里改为三轮僵尸波次，
-          // 不改动原有战斗和计分记录。
-          if (win && mod.wave < mod.waveCount && G.kills % 10 === 0 && !mod.waveTransition) {
+          // 基础版本在击杀数达到 10 时就判定胜利，这里改为无尽波次，
+          // 每波达到目标后继续生成更大的感染者编队。
+          if (win && !mod.waveTransition && G.kills >= mod.waveKillTarget) {
             nextWave();
             return;
           }
-          if (win && mod.wave < mod.waveCount) return;
+          // 基础脚本在击杀数达到 10 后每次击杀都会尝试结束游戏；
+          // 无尽模式只在达到当前波次目标时换波，其他情况直接拦截。
+          if (win) return;
           baseEnd(win);
           const score = document.getElementById('sKills');
-          if (score) score.innerHTML = G.kills + '<span>/30</span>';
+          if (score) score.innerHTML = G.kills + '<span>/∞</span>';
         };
         mod.endWrapped = true;
       }
@@ -856,6 +863,7 @@
           const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
           last = now;
           updateGrenades(dt);
+          if (typeof G !== 'undefined' && G.running && G.time <= 0) G.time = 180;
           baseFrame(now);
           updateUtilityView(dt);
         };

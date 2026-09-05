@@ -727,7 +727,7 @@ const SFX = (function(){
    ========================================================================= */
 const canvas   = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias:false, powerPreference:'high-performance', stencil:false });
-const DPR = Math.min(window.devicePixelRatio||1, 1.25);
+const DPR = Math.min(window.devicePixelRatio||1, 1.15);
 renderer.setPixelRatio(DPR);
 renderer.setSize(innerWidth, innerHeight);
 renderer.autoClear = false;
@@ -798,7 +798,7 @@ let sceneRT, bloomA, bloomB, RTW, RTH;
 /* The whole frame lands in an offscreen target that the composite pass
    upscales, so render resolution can float independently of the canvas. */
 let renderScale = 1.0;
-const SCALE_STEPS = [0.82, 0.72, 0.64, 0.56, 0.50];
+const SCALE_STEPS = [0.70, 0.62, 0.56, 0.50, 0.44];
 let scaleIdx = 1;
 function allocTargets(){
   RTW = Math.max(2, Math.floor(innerWidth*DPR*renderScale));
@@ -3035,6 +3035,8 @@ const dustField = (()=>{
   const pts = new THREE.Points(g, mat);
   pts.frustumCulled = false;
   pts.renderOrder = 3;
+  // 2600 个动态粒子在低端浏览器上只增加填充压力，轻量模式直接关闭。
+  pts.visible = false;
   scene.add(pts);
   return mat.uniforms;
 })();
@@ -3078,6 +3080,7 @@ const _sfT = new THREE.Vector3(), _sfX = new THREE.Vector3(), _sfM = new THREE.M
     m.scale.set(w, len, 1);
     m.renderOrder = 4;
     m.frustumCulled = false;
+    m.visible = false;
     scene.add(m);
     sunShafts.push(m);
   }
@@ -3089,7 +3092,7 @@ const _sfT = new THREE.Vector3(), _sfX = new THREE.Vector3(), _sfM = new THREE.M
    keeps its face to the camera costs eight quaternions a frame and always shows
    the soft cross-section instead. */
 function updateSunShafts(){
-  if (!sunShafts.length) return;
+  if (!sunShafts.length || !sunShafts[0].visible) return;
   for (const m of sunShafts){
     _sfT.copy(camera.position).sub(m.position);
     _sfT.addScaledVector(shaftAxis, -_sfT.dot(shaftAxis));
@@ -6495,20 +6498,10 @@ function frame(now){
     renderer.render(vmScene, vmCamera);
   }
 
-  brightMat.uniforms.tDiffuse.value = sceneRT.texture;
-  blit(brightMat, bloomA);
-  const bw = 1/Math.max(1,(RTW>>2)), bh = 1/Math.max(1,(RTH>>2));
-  blurMat.uniforms.tDiffuse.value = bloomA.texture;
-  blurMat.uniforms.dir.value.set(bw*1.0, 0); blit(blurMat, bloomB);
-  blurMat.uniforms.tDiffuse.value = bloomB.texture;
-  blurMat.uniforms.dir.value.set(0, bh*1.0); blit(blurMat, bloomA);
-  blurMat.uniforms.tDiffuse.value = bloomA.texture;
-  blurMat.uniforms.dir.value.set(bw*2.6, 0); blit(blurMat, bloomB);
-  blurMat.uniforms.tDiffuse.value = bloomB.texture;
-  blurMat.uniforms.dir.value.set(0, bh*2.6); blit(blurMat, bloomA);
-
+  // 低配模式跳过提亮和四次模糊，只保留一次合成，减少每帧 5 次全屏绘制。
+  compMat.uniforms.bloom.value = 0.0;
   compMat.uniforms.tScene.value = sceneRT.texture;
-  compMat.uniforms.tBloom.value = bloomA.texture;
+  compMat.uniforms.tBloom.value = sceneRT.texture;
   blit(compMat, null);
 }
 requestAnimationFrame(frame);
